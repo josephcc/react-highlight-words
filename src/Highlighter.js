@@ -1,20 +1,18 @@
 /* @flow */
-import { findAll } from 'highlight-words-core'
-import PropTypes from 'prop-types'
-import { createElement } from 'react'
-import memoizeOne from 'memoize-one'
+import { findAll } from "highlight-words-core";
+import PropTypes from "prop-types";
+import { createElement } from "react";
+import memoizeOne from "memoize-one";
 
 Highlighter.propTypes = {
   activeClassName: PropTypes.string,
   activeIndex: PropTypes.number,
   activeStyle: PropTypes.object,
   autoEscape: PropTypes.bool,
+  truncate: PropTypes.bool,
   className: PropTypes.string,
   findChunks: PropTypes.func,
-  highlightClassName: PropTypes.oneOfType([
-    PropTypes.object,
-    PropTypes.string
-  ]),
+  highlightClassName: PropTypes.oneOfType([PropTypes.object, PropTypes.string]),
   highlightStyle: PropTypes.object,
   highlightTag: PropTypes.oneOfType([
     PropTypes.node,
@@ -23,36 +21,34 @@ Highlighter.propTypes = {
   ]),
   sanitize: PropTypes.func,
   searchWords: PropTypes.arrayOf(
-    PropTypes.oneOfType([
-      PropTypes.string,
-      PropTypes.instanceOf(RegExp)
-    ])
+    PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(RegExp)])
   ).isRequired,
   textToHighlight: PropTypes.string.isRequired,
   unhighlightClassName: PropTypes.string,
   unhighlightStyle: PropTypes.object
-}
+};
 
 /**
  * Highlights all occurrences of search terms (searchText) within a string (textToHighlight).
  * This function returns an array of strings and <span>s (wrapping highlighted words).
  */
-export default function Highlighter ({
-  activeClassName = '',
+export default function Highlighter({
+  activeClassName = "",
   activeIndex = -1,
   activeStyle,
   autoEscape,
   caseSensitive = false,
   className,
   findChunks,
-  highlightClassName = '',
+  highlightClassName = "",
   highlightStyle = {},
-  highlightTag = 'mark',
+  highlightTag = "mark",
   sanitize,
   searchWords,
   textToHighlight,
-  unhighlightClassName = '',
+  unhighlightClassName = "",
   unhighlightStyle,
+  truncate,
   ...rest
 }) {
   const chunks = findAll({
@@ -62,71 +58,91 @@ export default function Highlighter ({
     sanitize,
     searchWords,
     textToHighlight
-  })
-  const HighlightTag = highlightTag
-  let highlightIndex = -1
-  let highlightClassNames = ''
-  let highlightStyles
+  });
+  const HighlightTag = highlightTag;
+  let highlightIndex = -1;
+  let highlightClassNames = "";
+  let highlightStyles;
 
   const lowercaseProps = object => {
-    const mapped = {}
+    const mapped = {};
     for (let key in object) {
-      mapped[key.toLowerCase()] = object[key]
+      mapped[key.toLowerCase()] = object[key];
     }
-    return mapped
-  }
-  const memoizedLowercaseProps = memoizeOne(lowercaseProps)
+    return mapped;
+  };
+  const memoizedLowercaseProps = memoizeOne(lowercaseProps);
 
-  return createElement('span', {
+  return createElement("span", {
     className,
     ...rest,
     children: chunks.map((chunk, index) => {
-      const text = textToHighlight.substr(chunk.start, chunk.end - chunk.start)
+      const text = textToHighlight.substr(chunk.start, chunk.end - chunk.start);
 
       if (chunk.highlight) {
-        highlightIndex++
+        highlightIndex++;
 
-        let highlightClass
-        if (typeof highlightClassName === 'object') {
+        let highlightClass;
+        if (typeof highlightClassName === "object") {
           if (!caseSensitive) {
-            highlightClassName = memoizedLowercaseProps(highlightClassName)
-            highlightClass = highlightClassName[text.toLowerCase()]
+            highlightClassName = memoizedLowercaseProps(highlightClassName);
+            highlightClass = highlightClassName[text.toLowerCase()];
           } else {
-            highlightClass = highlightClassName[text]
+            highlightClass = highlightClassName[text];
           }
         } else {
-          highlightClass = highlightClassName
+          highlightClass = highlightClassName;
         }
 
-        const isActive = highlightIndex === +activeIndex
+        const isActive = highlightIndex === +activeIndex;
 
-        highlightClassNames = `${highlightClass} ${isActive ? activeClassName : ''}`
-        highlightStyles = isActive === true && activeStyle != null
-          ? Object.assign({}, highlightStyle, activeStyle)
-          : highlightStyle
+        highlightClassNames = `${highlightClass} ${
+          isActive ? activeClassName : ""
+        }`;
+        highlightStyles =
+          isActive === true && activeStyle != null
+            ? Object.assign({}, highlightStyle, activeStyle)
+            : highlightStyle;
 
         const props = {
           children: text,
           className: highlightClassNames,
           key: index,
           style: highlightStyles
-        }
+        };
 
         // Don't attach arbitrary props to DOM elements; this triggers React DEV warnings (https://fb.me/react-unknown-prop)
         // Only pass through the highlightIndex attribute for custom components.
-        if (typeof HighlightTag !== 'string') {
-          props.highlightIndex = highlightIndex
+        if (typeof HighlightTag !== "string") {
+          props.highlightIndex = highlightIndex;
         }
 
-        return createElement(HighlightTag, props)
+        return createElement(HighlightTag, props);
       } else {
-        return createElement('span', {
+        const length = 50;
+        const grace = 10;
+        if (truncate) {
+          if (index === 0) {
+            text = `... ${text.slice(text.length - length, length)}`;
+          } else if (index === chunks.length - 1) {
+            text = text.slice(0, length);
+          } else {
+            if (text.length >= 2 * length + grace) {
+              text = `${text.slice(0, length)} ... ${text.slice(
+                text.length - length,
+                length
+              )}`;
+            }
+          }
+        }
+
+        return createElement("span", {
           children: text,
           className: unhighlightClassName,
           key: index,
           style: unhighlightStyle
-        })
+        });
       }
     })
-  })
+  });
 }
